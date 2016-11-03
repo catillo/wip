@@ -81,6 +81,9 @@ def findPoints(header, data, dataOffset, sampleWidth):
 
             x += 1
 
+    assert None not in points
+    points.sort()
+
     return points
 
 def main():
@@ -109,7 +112,7 @@ def main():
         prevPoint = None
 
         for p in points:
-            if False:
+            if True:
                 if prevPoint == None:
                     prevPoint = p
                 else:
