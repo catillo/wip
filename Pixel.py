@@ -8,16 +8,7 @@ class Pixel(object):
         self.point = Point(int(x),int(y))
 
     def draw(self, screen):
-        point = self.point
-        assert point.x < screen.width
-        assert point.y < screen.height
-
-        r = screen.getRow(point.y)
-        p = r[point.x]
-
-        p.r = self.r
-        p.g = self.g
-        p.b = self.b
+        screen.setPixel(self)
 
 
     def __del__(self):

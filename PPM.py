@@ -7,12 +7,12 @@ class PPM(object):
     def writeToFile(self, filename):
         screen = self.screen
         f = open(filename, 'wb')
-        header = 'P6\n%d\n %d\n255\n' % (screen.width, screen.height)
+        header = 'P6\n%d %d\n255\n' % (screen.width, screen.height)
         f.write(header)
 
-        for h in range(0, screen.height):
-            r = screen.getRow(screen.height - 1 - h)
-            for p in r:
+        for y in range(0, screen.height):
+            for x in range(0, screen.width):
+                p = screen.getPixel(x, screen.height - 1 - y)
                 ba = bytearray([p.r, p.g, p.b])
                 f.write(ba)
 

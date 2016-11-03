@@ -19,6 +19,15 @@ class Color(object):
             r = 255
             g = 255
             b = 0
+        elif color == 'blue':
+            r = 0
+            g = 0
+            b = 255
+        elif color == 'grey':
+            r = 225
+            g = 225
+            b = 225
+
         else:
             assert False, 'Unsupported color!'
 
