@@ -40,6 +40,15 @@ def getHeader(data):
 
     return header, dataOffset
 
+def duplicateXinList(p, l):
+    x = p.point.x
+    for i in l:
+        if i.point.x == x:
+            print 'Found a duplicate...'
+            return True
+    return False
+
+
 def findPoints(header, data, dataOffset, sampleWidth):
     width = int(header['width'])
     height = int(header['height'])
@@ -84,7 +93,12 @@ def findPoints(header, data, dataOffset, sampleWidth):
     assert None not in points
     points.sort()
 
-    return points
+    filtered = []
+    for p in points:
+        if not duplicateXinList(p, filtered):
+            filtered.append(p)
+
+    return filtered
 
 def main():
     args = sys.argv
@@ -116,9 +130,9 @@ def main():
                 if prevPoint == None:
                     prevPoint = p
                 else:
-                    print 'Making line %d,%d - %d,%d' % (prevPoint.point.x, prevPoint.point.y, 
+                    print 'Making line %d,%d - %d,%d' % (prevPoint.point.x, prevPoint.point.y,
                                                          p.point.x, p.point.y)
-                    l = Line(prevPoint.point.x, prevPoint.point.y, 
+                    l = Line(prevPoint.point.x, prevPoint.point.y,
                          p.point.x, p.point.y, "blue")
                     l.draw(s)
 
