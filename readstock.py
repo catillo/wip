@@ -129,7 +129,6 @@ class SPAction_BuyNoSell (object):
         self.initialPoint = None
         self.isp = 100.00                # initial stock price
         self.investment = 1000.00
-        self.totalSavings = 0.00
         self.numStocks = 0.00
         self.totalInvestment = 0.00
         self.stockPrice = None
@@ -137,12 +136,12 @@ class SPAction_BuyNoSell (object):
     def run(self, point):
         if self.initialPoint == None:
             self.initialPoint = point
-            self.iy  = initialPoint.point.y  # initial y
+            self.iy  = self.initialPoint.point.y  # initial y
 
 
-        self.stockPrice = (self.isp * p.point.y) / self.iy
+        self.stockPrice = (self.isp * point.point.y) / self.iy
 
-        stocks_bought = (investment / self.stockPrice)
+        stocks_bought = (self.investment / self.stockPrice)
         self.numStocks += stocks_bought
 
         self.totalInvestment += self.investment
@@ -159,37 +158,98 @@ class SPAction_BuyNoSell (object):
     def __del__(self):
         pass
 
+class SPAction_BuyAndSellAtThreshold (object):
+    def __init__(self):
+        self.initialPoint = None
+        self.buyBelow = 104.00
+        self.sellAbove = 108.00
+        self.initialStockPrice = 100.00                # initial stock price
+        self.investmentPerCycle = 1000.00
+        self.totalNumStocks = 0
+        self.totalInvestment = 0.00
+        self.stockPrice = None
+        self.cashOnHand = 0.00
 
-def calculateSavings(points):
-    initialPoint = points[0]
+    def buy(self, stockPrice):
+        stocks_bought = int(self.cashOnHand / stockPrice)
 
-    iy  = initialPoint.point.y  # initial y
-    isp = 100.00                # initial stock price
+        if stocks_bought <= 0:
+            print """Can't buy. Not enough cash!"""
+            return
 
-    investment = 1000.00
-    totalSavings = 0.00
-    numStocks = 0.00
-    totalInvestment = 0.00
+        total_bill = stockPrice * stocks_bought 
 
-    ns = None
+        remainder = self.cashOnHand % stockPrice
 
+        self.cashOnHand -= total_bill
+        assert self.cashOnHand >= 0
+        self.cashOnHand += remainder
+
+        self.totalNumStocks += stocks_bought
+
+        print 'Bought stock at %f per share' % stockPrice
+
+    def sell(self, stockPrice):
+        if self.totalNumStocks <= 0:
+            print 'Nothing to sell!!!'
+            return
+
+        self.cashOnHand += (stockPrice * self.totalNumStocks)
+        stocksSold = self.totalNumStocks
+        self.totalNumStocks = 0
+
+        print 'Sold %d stock(s) at %f per share' % (stocksSold, self. stockPrice)
+
+
+    def run(self, point):
+        if self.initialPoint == None:
+            self.initialPoint = point
+            self.iy  = self.initialPoint.point.y  # initial y
+            print 'Stock multiplier = %f' % (self.initialStockPrice  / self.iy)
+
+
+        self.cashOnHand += self.investmentPerCycle
+        self.totalInvestment += self.investmentPerCycle
+
+        self.stockPrice = (self.initialStockPrice * point.point.y) / self.iy
+
+        print 'Stock Price at %f' % (self.stockPrice)
+
+        if (self.stockPrice >= self.sellAbove):
+            self.sell(self.stockPrice)
+        elif (self.stockPrice <= self.buyBelow):
+            self.buy(self.stockPrice)
+
+
+
+    def finish(self):
+        print '\n'
+        print 'totalInvestment = %f' % self.totalInvestment
+        print 'Last stock price = %f' % self.stockPrice
+        print 'numStocks = %f' % self.totalNumStocks
+
+        totalStock_CashValue = (self.stockPrice * self.totalNumStocks)
+        print 'total cash value of stocks = %f' % totalStock_CashValue
+
+        print 'total cash on hand = %f' % self.cashOnHand
+
+        totalCashValue = (self.cashOnHand + ((self.stockPrice * self.totalNumStocks)))
+        print 'Total Cash Value = %f' % totalCashValue
+
+        growth = (((totalCashValue - self.totalInvestment) / self.totalInvestment) * 100.00)
+        print 'Growth = %0.2f %%' % growth
+
+    def __del__(self):
+        pass
+
+
+def calculateSavings(points, action):
     for p in points:
-        ns = (isp * p.point.y) / iy
+        action.run(p)
+        
 
-        sb = (investment / ns)
-        numStocks += sb
-
-        totalInvestment += investment
-
-        print "New stock price = %f" % ns
-
-    print '\n'
-    print 'totalInvestment = %f' % totalInvestment
-    print 'Last stock price = %f' % ns
-    print 'numStocks = %f' % numStocks
-    print 'total cash value = %f' % (ns * numStocks)
-
-    # every point, we add 1K php
+    action.finish()
+    # every point, we add 1K phpe
 
 def main():
     args = sys.argv
@@ -210,11 +270,12 @@ def main():
         print 'Header = %s' % (pformat(header))
         print 'Dataoffset = %d' % (dataOffset)
 
-        points = findPoints(header, data, dataOffset, 10)
+        points = findPoints(header, data, dataOffset, 50)
 
     #drawPoints(points)
 
-    savings = calculateSavings(points)
+    #savings = calculateSavings(points, SPAction_BuyNoSell())
+    savings = calculateSavings(points, SPAction_BuyAndSellAtThreshold())
 
 
 main()

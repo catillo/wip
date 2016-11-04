@@ -21,11 +21,29 @@ class Graph(object):
 
 
         self.lines = []
+        runner = 0
         for x in xpoints:
-            self.lines.append(Line(x,0, x,height, color))
+            if (runner % 15) == 0:
+                lineColor = 'red'
+            elif (runner % 5) == 0:
+                lineColor = 'green'
+            else:
+                lineColor = 'grey'
 
+            self.lines.append(Line(x, 0, x, height, lineColor))
+            runner += 1
+
+        runner = 0
         for y in ypoints:
-            self.lines.append(Line(0,y, width,y, color))
+            if (runner % 15) == 0:
+                lineColor = 'red'
+            elif (runner % 5) == 0:
+                lineColor = 'green'
+            else:
+                lineColor = 'grey'
+
+            self.lines.append(Line(0,y, width,y, lineColor))
+            runner += 1
 
     def draw(self, screen):
         for l in self.lines:
