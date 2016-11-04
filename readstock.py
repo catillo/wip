@@ -44,7 +44,6 @@ def duplicateXinList(p, l):
     x = p.point.x
     for i in l:
         if i.point.x == x:
-            print 'Found a duplicate...'
             return True
     return False
 
@@ -100,6 +99,98 @@ def findPoints(header, data, dataOffset, sampleWidth):
 
     return filtered
 
+def drawPoints(points):
+    s = Screen(2000, 1000)
+    g = Graph(1999, 999, 10, 10, 'grey')
+    g.draw(s)
+    prevPoint = None
+
+    for p in points:
+        if True:
+            if prevPoint == None:
+                prevPoint = p
+            else:
+                '''print 'Making line %d,%d - %d,%d' % (prevPoint.point.x, prevPoint.point.y,
+                                                     p.point.x, p.point.y)'''
+                l = Line(prevPoint.point.x, prevPoint.point.y,
+                     p.point.x, p.point.y, "blue")
+                l.draw(s)
+
+                prevPoint = p
+        else:
+            print 'Point (%d,%d) ' % (p.point.x, p.point.y)
+            p.draw(s)
+
+    p = PPM(s)
+    p.writeToFile('newimage.ppm')
+
+class SPAction_BuyNoSell (object):
+    def __init__(self):
+        self.initialPoint = None
+        self.isp = 100.00                # initial stock price
+        self.investment = 1000.00
+        self.totalSavings = 0.00
+        self.numStocks = 0.00
+        self.totalInvestment = 0.00
+        self.stockPrice = None
+
+    def run(self, point):
+        if self.initialPoint == None:
+            self.initialPoint = point
+            self.iy  = initialPoint.point.y  # initial y
+
+
+        self.stockPrice = (self.isp * p.point.y) / self.iy
+
+        stocks_bought = (investment / self.stockPrice)
+        self.numStocks += stocks_bought
+
+        self.totalInvestment += self.investment
+
+        print "New stock price = %f" % self.stockPrice
+
+    def finish(self):
+        print '\n'
+        print 'totalInvestment = %f' % self.totalInvestment
+        print 'Last stock price = %f' % self.stockPrice
+        print 'numStocks = %f' % self.numStocks
+        print 'total cash value = %f' % (self.stockPrice * self.numStocks)
+
+    def __del__(self):
+        pass
+
+
+def calculateSavings(points):
+    initialPoint = points[0]
+
+    iy  = initialPoint.point.y  # initial y
+    isp = 100.00                # initial stock price
+
+    investment = 1000.00
+    totalSavings = 0.00
+    numStocks = 0.00
+    totalInvestment = 0.00
+
+    ns = None
+
+    for p in points:
+        ns = (isp * p.point.y) / iy
+
+        sb = (investment / ns)
+        numStocks += sb
+
+        totalInvestment += investment
+
+        print "New stock price = %f" % ns
+
+    print '\n'
+    print 'totalInvestment = %f' % totalInvestment
+    print 'Last stock price = %f' % ns
+    print 'numStocks = %f' % numStocks
+    print 'total cash value = %f' % (ns * numStocks)
+
+    # every point, we add 1K php
+
 def main():
     args = sys.argv
 
@@ -108,6 +199,8 @@ def main():
         return -1
 
     in_ppm = args[1]
+
+    points = None
 
     with open(in_ppm, 'rb') as file:
         data = file.read()
@@ -119,28 +212,9 @@ def main():
 
         points = findPoints(header, data, dataOffset, 10)
 
-        s = Screen(2000, 1000)
-        g = Graph(1999, 999, 10, 10, 'grey')
-        g.draw(s)
-        blue = Color('blue')
-        prevPoint = None
+    #drawPoints(points)
 
-        for p in points:
-            if True:
-                if prevPoint == None:
-                    prevPoint = p
-                else:
-                    print 'Making line %d,%d - %d,%d' % (prevPoint.point.x, prevPoint.point.y,
-                                                         p.point.x, p.point.y)
-                    l = Line(prevPoint.point.x, prevPoint.point.y,
-                         p.point.x, p.point.y, "blue")
-                    l.draw(s)
+    savings = calculateSavings(points)
 
-                    prevPoint = p
-            else:
-                print 'Point (%d,%d) ' % (p.point.x, p.point.y)
-                p.draw(s)
 
-        p = PPM(s)
-        p.writeToFile('newimage.ppm')
 main()
