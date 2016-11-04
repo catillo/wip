@@ -161,14 +161,15 @@ class SPAction_BuyNoSell (object):
 class SPAction_BuyAndSellAtThreshold (object):
     def __init__(self):
         self.initialPoint = None
-        self.buyBelow = 104.00
-        self.sellAbove = 108.00
         self.initialStockPrice = 100.00                # initial stock price
         self.investmentPerCycle = 1000.00
         self.totalNumStocks = 0
         self.totalInvestment = 0.00
         self.stockPrice = None
         self.cashOnHand = 0.00
+
+        self.buyBelow = 140.00
+        self.sellAbove = 147.00
 
     def buy(self, stockPrice):
         stocks_bought = int(self.cashOnHand / stockPrice)
@@ -270,7 +271,7 @@ def main():
         print 'Header = %s' % (pformat(header))
         print 'Dataoffset = %d' % (dataOffset)
 
-        points = findPoints(header, data, dataOffset, 50)
+        points = findPoints(header, data, dataOffset, 40)
 
     #drawPoints(points)
 
