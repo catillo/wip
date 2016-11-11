@@ -34,9 +34,23 @@ class Song():
 
     def __repr__(self):
         return '%s - %s' % (self.artist, self.title)
-        
+
     def __del__(self):
         pass
+
+def generateKey(artist):
+    key = artist.lower()
+    key = key.split(' feat')[0]
+    key = key.split(' ft.')[0]
+    key = ''.join(k for k in key if k.isalnum())
+
+    return key
+
+def isHated(key):
+    hatedKeys = ['eminem', 'eraserheads', 'garyvalenciano', 'gerihalliwell']
+    if key in hatedKeys:
+        return True
+    return False
 
 def main(argv):
     try:
@@ -66,15 +80,18 @@ def main(argv):
             artist = str(f.get('TPE1', None))
             title = str(f.get('TIT2', None))
 
-            invalid_artist = ['NONE', 'UNKNOWN']
+            invalid_artist = ['none', 'unknown']
 
-            if  artist != None and artist.upper() not in invalid_artist:
+            if  artist != None :
+                key = generateKey(artist)
+                if isHated(key):
+                    continue
 
-                #print '%s - %s' % (artist, title)
-                if artist not in master_list:
-                    master_list[artist] = []
+                if key not in invalid_artist:
+                    if key not in master_list:
+                        master_list[key] = []
 
-                master_list[artist].append(Song(m, artist,title))
+                    master_list[key].append(Song(m, artist,title))
 
         print 'master_list = %s' % (pformat(master_list))
 
