@@ -1,39 +1,38 @@
-namespace Corbot {
-    class DeltaTime {
-    private:
-        struct timeb _startTime;
-    public:
-        DeltaTime();
-        virtual ~DeltaTime();
-        void reset();
-        double getDeltaMs();
-    };
+int bpm;
+unsigned long ms_per_led;
+unsigned long ms_per_cycle;
+unsigned long diastole_delay;
 
-    static double deltaTime(const timeb &before, const timeb &after) {
-        double bTime = (before.time * 1000.0) + static_cast<double>(before.millitm);
-        double aTime = (after.time * 1000.0) + static_cast<double>(after.millitm);
-        // return in milliseconds.
-        return aTime - bTime;
+unsigned char ledPins[] = {2,3,4,5,6,7,8,9};
+
+void setup() {
+  bpm = 60;
+
+  ms_per_cycle = ((unsigned long) 60 * 1000) / bpm;
+  ms_per_led = ((unsigned long) ms_per_cycle) / 24;
+  diastole_delay = ((unsigned long) ms_per_cycle * 2) / 3;
+
+  for(int i = 0; i < sizeof(ledPins); i++){
+    pinMode(ledPins[i], OUTPUT);
+  }
+
+  for(int i=0; i < sizeof(ledPins); i++) {
+    digitalWrite(ledPins[i], LOW);
+  }
+}
+
+void loop() {
+  for(int i=0; i < sizeof(ledPins); i++) {
+    digitalWrite(ledPins[i], HIGH);
+    delay(ms_per_led);
+
+    if (i < sizeof(ledPins) - 1) {
+      digitalWrite(ledPins[i], LOW);
     }
+  }
+
+  delay(diastole_delay);
+  digitalWrite(ledPins[sizeof(ledPins)-1], LOW);
 
 
-    void DeltaTime::reset() {
-        srand(time(0));
-        ftime(&_startTime);
-    }
-
-    DeltaTime::DeltaTime() {
-        reset();
-    }
-
-    DeltaTime::~DeltaTime() {
-    }
-
-    double DeltaTime::getDeltaMs() {
-        struct timeb after;
-        ftime(&after);
-
-        // return in milliseconds.
-        return deltaTime(_startTime, after);
-    }
 }
