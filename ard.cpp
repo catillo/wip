@@ -154,45 +154,37 @@ public:
     virtual void run(unsigned long elapsed_millis);
 };
 
-class CheckPosition : public TimerFunction {
+class CheckPosition {
 private:
   UpdateLED* _updateLed;
 public:
   bool _standing;
-  CheckPosition(UpdateLED* updateLed);
+  CheckPosition();
   ~CheckPosition();
-  void run(unsigned long elapsed_millis);
+  void run();
 };
 
-class CheckPressure : public TimerFunction {
+class CheckPressure {
 private:
   UpdateLED* _updateLed;
 public:
-  CheckPressure(UpdateLED* updateLed);
+  CheckPressure();
   ~CheckPressure();
-  void run(unsigned long elapsed_millis);
+  void run();
 };
 
 class Corbot : public TimerFunction {
 private:
   UpdateLED* _updateLed;
-  CheckPosition* _cpos;
-  CheckPressure* _cpressure;
+  auto_ptr<CheckPosition> _cpos;
+  auto_ptr<CheckPressure> _cpressure;
 public:
-  Corbot(UpdateLED* updateLed, CheckPosition* cpos, CheckPressure* cpressure);
+  Corbot(UpdateLED* updateLed, auto_ptr<CheckPosition> cpos, auto_ptr<CheckPressure> cpressure);
   ~Corbot();
+  void run(unsigned long elapsed_millis);
 };
 
-Corbot::Corbot(UpdateLED* updateLed, CheckPosition* cpos, CheckPressure* cpressure) :
-  _updateLed(updateLed),
-  _cpos(cpos),
-  _cpressure(cpressure) {
 
-}
-
-Corbot::~Corbot() {
-
-}
 
 ListElem TimerSys::_functions;
 unsigned char UpdateLED::_ledStates[] = {
@@ -218,16 +210,16 @@ unsigned long round_closest_divide(unsigned long dividend, unsigned long divisor
     return (dividend + (divisor / 2)) / divisor;
 }
 
-CheckPressure::CheckPressure(UpdateLED* updateLed) : _updateLed(updateLed) {
+CheckPressure::CheckPressure() {
 }
 
 CheckPressure::~CheckPressure() {
 }
 
-void CheckPressure::run(unsigned long elapsed_millis) {
+void CheckPressure::run() {
 }
 
-CheckPosition::CheckPosition(UpdateLED* updateLed) : _updateLed(updateLed), _standing(false) {
+CheckPosition::CheckPosition() : _standing(false) {
   pinMode(POSITION_SENSOR_PIN, INPUT);
 
 }
@@ -235,12 +227,27 @@ CheckPosition::CheckPosition(UpdateLED* updateLed) : _updateLed(updateLed), _sta
 CheckPosition::~CheckPosition() {
 }
 
-void CheckPosition::run(unsigned long elapsed_millis) {
+void CheckPosition::run() {
   if (digitalRead(POSITION_SENSOR_PIN) == HIGH) {
     _standing = true;
   } else {
     _standing = false;
   }
+}
+
+Corbot::Corbot(UpdateLED* updateLed, auto_ptr<CheckPosition> cpos, auto_ptr<CheckPressure> cpressure) :
+  _updateLed(updateLed),
+  _cpos(cpos),
+  _cpressure(cpressure) {
+
+}
+
+Corbot::~Corbot() {
+
+}
+
+void Corbot::run(unsigned long elapsed_millis) {
+
 }
 
 
@@ -513,13 +520,11 @@ void setup(void) {
   unsigned long elapsed_millis = millis();
 
   auto_ptr<TimerFunction> updateLed(new UpdateLED(60, elapsed_millis));
-  auto_ptr<TimerFunction> checkPosition(new CheckPosition(static_cast<UpdateLED*>(updateLed.get())));
-  auto_ptr<TimerFunction> checkPressure(new CheckPressure(static_cast<UpdateLED*>(updateLed.get())));
-  auto_ptr<TimerFunction> corbot(new Corbot(updateLed.get(), checkPosition.get(), checkPressure.get()));
+  auto_ptr<CheckPosition> checkPosition(new CheckPosition());
+  auto_ptr<CheckPressure> checkPressure(new CheckPressure());
+  auto_ptr<TimerFunction> corbot(new Corbot(static_cast<UpdateLED*>(updateLed.get()), checkPosition, checkPressure));
 
   TimerSys::register_func(updateLed, 0);
-  TimerSys::register_func(checkPosition, 100);
-  TimerSys::register_func(checkPressure, 100);
   TimerSys::register_func(corbot, 250);
 }
 
