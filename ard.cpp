@@ -2,6 +2,9 @@
     #include "common.h"
 #endif
 
+/* http://disease13.imascientist.org.au/2013/03/18/what-are-the-highest-and-lowest-known-pulses-heart-rate-recorded/ */
+#define MAX_HEART_RATE 400
+
 void sleep_device() {
 #if defined(LINUX_COMPILE)
     int rc;
@@ -70,6 +73,7 @@ public:
     }
 };
 
+
 class Element {
 public:
     Element* _next;
@@ -82,11 +86,14 @@ private:
     unsigned long _interval;
     unsigned long _lastRun;
 public:
-    TimerFunction(unsigned long interval);
-    ~TimerFunction();
+    TimerFunction();
+    virtual ~TimerFunction();
     void update(unsigned long elapsed_millis);
     virtual void run(unsigned long elapsed_millis) = 0;
+    void setInterval(unsigned long interval);
 };
+
+
 
 class ListIterator;
 class ListElem : public Element {
@@ -119,7 +126,7 @@ class TimerSys {
 private:
 public:
     static ListElem _functions;
-    static bool register_func(auto_ptr<TimerFunction> tf);
+    static bool register_func(auto_ptr<TimerFunction> tf, unsigned long interval);
     static void update(unsigned long elapsed_millis);
 };
 
@@ -139,10 +146,30 @@ private:
     unsigned int _newBpm;
 public:
     static void writeLed(unsigned char state);
-    void updateTimeTable(unsigned long* pTimeTableSrc, unsigned long* pTimeTableDest, int size, unsigned long elapsed_millis);
-    UpdateLED(unsigned long elapsed_millis, unsigned long interval);
+    void updateTimeTable(unsigned long elapsed_millis);
+    void updateStateTable();
+    void updateBpm(unsigned int bpm);
+    UpdateLED(unsigned int bpm, unsigned long elapsed_millis);
     ~UpdateLED();
     virtual void run(unsigned long elapsed_millis);
+};
+
+class CheckPosition : public TimerFunction {
+private:
+  UpdateLED* _updateLed;
+public:
+  CheckPosition(UpdateLED* updateLed);
+  ~CheckPosition();
+  void run(unsigned long elapsed_millis);
+};
+
+class CheckPressure : public TimerFunction {
+private:
+  UpdateLED* _updateLed;
+public:
+  CheckPressure(UpdateLED* updateLed);
+  ~CheckPressure();
+  void run(unsigned long elapsed_millis);
 };
 
 ListElem TimerSys::_functions;
@@ -164,6 +191,25 @@ unsigned long round_closest_divide(unsigned long dividend, unsigned long divisor
 {
     return (dividend + (divisor / 2)) / divisor;
 }
+
+CheckPressure::CheckPressure(UpdateLED* updateLed) : _updateLed(updateLed) {
+}
+
+CheckPressure::~CheckPressure() {
+}
+
+void CheckPressure::run(unsigned long elapsed_millis) {
+}
+
+CheckPosition::CheckPosition(UpdateLED* updateLed) : _updateLed(updateLed) {
+}
+
+CheckPosition::~CheckPosition() {
+}
+
+void CheckPosition::run(unsigned long elapsed_millis) {
+}
+
 
 /*****************************************************************
     CLASS BODY
@@ -253,7 +299,7 @@ bool ListIterator::hasNext() {
     return false;
 }
 
-TimerFunction::setInterval(unsigned long interval) {
+void TimerFunction::setInterval(unsigned long interval) {
     _interval = interval;
 }
 
@@ -306,13 +352,13 @@ void printTimeTable(unsigned long* pTimeTable, int size) {
     }
 }
 
-void UpdateLED::updateTimeTable(unsigned long* pTimeTableSrc, unsigned long* pTimeTableDest, int size,
-                                unsigned long elapsed_millis) {
+void UpdateLED::updateTimeTable(unsigned long elapsed_millis) {
+    int size = _numLedStates + 1;
 
     for (int i = 0; i < size; i++) {
-        pTimeTableDest[i] = elapsed_millis + pTimeTableSrc[i];
+        _currTimeTable[i] = elapsed_millis + _stateTimeTable[i];
     }
-    printTimeTable(_pTimeTableDest, _numLedStates+1);
+    printTimeTable(_currTimeTable, size);
 }
 
 void UpdateLED::writeLed(unsigned char state) {
@@ -329,7 +375,7 @@ void UpdateLED::writeLed(unsigned char state) {
   }
 }
 
-UpdateLED::UpdateLED(unsigned int bpm, unsigned long elapsed_millis, unsigned long interval) :
+UpdateLED::UpdateLED(unsigned int bpm, unsigned long elapsed_millis) :
     TimerFunction(), _lastRun(elapsed_millis), _currLedState(0),
     _numLedStates(0), _currTimeTable(0), _stateTimeTable(0), _phase(PHASE_SYSTOLE) {
 
@@ -350,7 +396,7 @@ UpdateLED::UpdateLED(unsigned int bpm, unsigned long elapsed_millis, unsigned lo
     _stateTimeTable = new unsigned long[_numLedStates + 1];
 
     updateStateTable();
-    updateTimeTable();
+    updateTimeTable(elapsed_millis);
 }
 
 void UpdateLED::updateStateTable() {
@@ -416,7 +462,7 @@ void UpdateLED::run(unsigned long elapsed_millis) {
                 updateStateTable();
             }
 
-            updateTimeTable(_stateTimeTable, _currTimeTable, _numLedStates + 1, elapsed_millis);
+            updateTimeTable(elapsed_millis);
 
             numBeats++;
 
@@ -433,8 +479,8 @@ void setup(void) {
   unsigned long elapsed_millis = millis();
 
   auto_ptr<TimerFunction> updateLed(new UpdateLED(60, elapsed_millis));
-  auto_ptr<TimerFunction> checkPosition(new CheckPosition(uled.get()));
-  auto_ptr<TimerFunction> checkPressure(new CheckPressure(uled.get()));
+  auto_ptr<TimerFunction> checkPosition(new CheckPosition(static_cast<UpdateLED*>(updateLed.get())));
+  auto_ptr<TimerFunction> checkPressure(new CheckPressure(static_cast<UpdateLED*>(updateLed.get())));
 
   TimerSys::register_func(updateLed, 0);
   TimerSys::register_func(checkPosition, 100);
