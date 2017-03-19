@@ -1,5 +1,5 @@
 /* http://disease13.imascientist.org.au/2013/03/18/what-are-the-highest-and-lowest-known-pulses-heart-rate-recorded/ */
-#define MAX_HEART_RATE 300
+#define MAX_HEART_RATE                300
 
 #define CORBOT_RESTING_HEART_RATE     60
 #define CORBOT_INCREASED_HEART_RATE   120
@@ -11,15 +11,10 @@
 #define BPM_ACCELERATION              5
 #define SERIAL_BAUD_RATE              230400
 
-#define TEMPERATURE_SENSOR_PIN 10
-#define VIBRATION_SENSOR_PIN 11
-#define POSITION_SENSOR_PIN 12
-#define PRESSURE_SENSOR_PIN 13
-
-#define PHASE_INITIALIZING      0
-#define PHASE_SYSTOLE           1
-#define PHASE_DIASTOLE          2
-
+#define TEMPERATURE_SENSOR_PIN        10
+#define VIBRATION_SENSOR_PIN          11
+#define POSITION_SENSOR_PIN           12
+#define PRESSURE_SENSOR_PIN           13
 
 /****************************************************************/
 /****************************************************************/
@@ -110,20 +105,20 @@ public:
 class TimerFunction : public Element {
 private:
     unsigned long _interval;
-    unsigned long _lastRun;
+    unsigned long _timeToNextRun;
 public:
     TimerFunction();
     virtual ~TimerFunction();
     void update(unsigned long elapsed_millis);
     virtual void run(unsigned long elapsed_millis) = 0;
-    void setInterval(unsigned long interval);
+    void setInterval(unsigned long interval, unsigned long elapsed_millis);
 };
 
 class TimerSys {
 private:
 public:
     static ListElem _functions;
-    static bool register_func(auto_ptr<TimerFunction> tf, unsigned long interval);
+    static bool register_func(auto_ptr<TimerFunction> tf, unsigned long interval, unsigned long elapsed_millis);
     static void update(unsigned long elapsed_millis);
 };
 
@@ -132,19 +127,17 @@ private:
     static unsigned char _ledStates[];
     static unsigned char _ledPins[];
 
-
-    unsigned long _lastRun;
     unsigned int _currLedState;
+    unsigned long _currTimeToNextState;
+    unsigned long _currTimePerLED;
     int _numLedStates;
-    unsigned long* _currTimeTable;
-    unsigned long* _stateTimeTable;
-    int _phase;
     unsigned int _currBpm;
     unsigned int _newBpm;
+    unsigned long _ms_per_cycle;
+    unsigned long _diastole_len;
+    void UpdateTimings();
 public:
     static void writeLed(unsigned char state);
-    void updateTimeTable(unsigned long elapsed_millis);
-    void updateStateTable();
     void updateBpm(unsigned int bpm);
     Heart(unsigned int bpm, unsigned long elapsed_millis);
     ~Heart();
@@ -302,31 +295,25 @@ bool ListIterator::hasNext() {
     return false;
 }
 
-void TimerFunction::setInterval(unsigned long interval) {
+void TimerFunction::setInterval(unsigned long interval, unsigned long elapsed_millis) {
     _interval = interval;
+    _timeToNextRun = elapsed_millis + _interval;
 }
 
-TimerFunction::TimerFunction() : _interval(0), _lastRun(0) {}
+TimerFunction::TimerFunction() : _interval(0), _timeToNextRun(0) {}
 TimerFunction::~TimerFunction() {}
 
 void TimerFunction::update(unsigned long elapsed_millis) {
     if (_interval == 0) {
       run(elapsed_millis);
-    } else {
-      if (_lastRun == 0) {
-          _lastRun = elapsed_millis;
-          return;
-      } else {
-          if ((elapsed_millis - _lastRun) > _interval) {
-              _lastRun = elapsed_millis;
-              run(elapsed_millis);
-          }
-      }
+    } else if(elapsed_millis >= _timeToNextRun) {
+        run(elapsed_millis);
+        _timeToNextRun += _interval;
     }
 }
 
-bool TimerSys::register_func(auto_ptr<TimerFunction> tf, unsigned long interval) {
-    tf->setInterval(interval);
+bool TimerSys::register_func(auto_ptr<TimerFunction> tf, unsigned long interval, unsigned long elapsed_millis) {
+    tf->setInterval(interval, elapsed_millis);
     auto_ptr<Element> t (tf.release());
     return TimerSys::_functions.add(t);
 }
@@ -338,28 +325,6 @@ void TimerSys::update(unsigned long elapsed_millis) {
         TimerFunction* tf = static_cast<TimerFunction*>(i->next());
         tf->update(elapsed_millis);
     }
-}
-
-void printTimeTable(unsigned long* pTimeTable, int size) {
-#if defined(DEBUG_ON)
-    Serial.print("\n");
-    for (int i=0; i < size; i++) {
-        Serial.print("timeTable[");
-        Serial.print(i);
-        Serial.print("] = ");
-        Serial.print(*pTimeTable++);
-        Serial.print("\n");
-    }
-#endif
-}
-
-void Heart::updateTimeTable(unsigned long elapsed_millis) {
-    int size = _numLedStates + 1;
-
-    for (int i = 0; i < size; i++) {
-        _currTimeTable[i] = elapsed_millis + _stateTimeTable[i];
-    }
-    printTimeTable(_currTimeTable, size);
 }
 
 void Heart::writeLed(unsigned char state) {
@@ -377,8 +342,15 @@ void Heart::writeLed(unsigned char state) {
 }
 
 Heart::Heart(unsigned int bpm, unsigned long elapsed_millis) :
-    TimerFunction(), _lastRun(elapsed_millis), _currLedState(0),
-    _numLedStates(0), _currTimeTable(0), _stateTimeTable(0), _phase(PHASE_SYSTOLE) {
+    TimerFunction(),
+    _currLedState(0),
+    _currTimeToNextState(0),
+    _currTimePerLED(0),
+    _numLedStates(0),
+    _currBpm(bpm),
+    _newBpm(bpm),
+    _ms_per_cycle(0),
+    _diastole_len(0) {
 
     for(int i = 0; i < sizeof(Heart::_ledPins); i++){
       pinMode(Heart::_ledPins[i], OUTPUT);
@@ -389,40 +361,20 @@ Heart::Heart(unsigned int bpm, unsigned long elapsed_millis) :
         return;
     }
 
-    _currBpm = bpm;
-    _newBpm = bpm;
+    UpdateTimings();
+    _currTimeToNextState = elapsed_millis + _currTimePerLED;
 
-    _currTimeTable = new unsigned long[_numLedStates + 1];
-    _stateTimeTable = new unsigned long[_numLedStates + 1];
-
-    updateStateTable();
-    updateTimeTable(elapsed_millis);
+    unsigned char ledState = _ledStates[_currLedState];
+    Heart:writeLed(ledState);
 }
 
-void Heart::updateStateTable() {
-  int bpm = _currBpm;
-
-  unsigned long ms_per_cycle = ((unsigned long) SECONDS_IN_1_MIN * MS_IN_1_SEC) / bpm;
-
-  int cycle_divisor = _numLedStates * 3;
-  for (int i=0; i < _numLedStates; i++) {
-      _stateTimeTable[i] = (round_closest_divide(ms_per_cycle, cycle_divisor) * i);
-  }
-  _stateTimeTable[_numLedStates] = ms_per_cycle;
-
-  printTimeTable(_stateTimeTable, _numLedStates + 1);
+void Heart::UpdateTimings() {
+  _ms_per_cycle = ((unsigned long) SECONDS_IN_1_MIN * MS_IN_1_SEC) / _currBpm;
+  _diastole_len = (_ms_per_cycle * 2) / 3; // diastole is 2/3 of cycle
+  _currTimePerLED = _ms_per_cycle / 24; // (ms_per_cycle * 1/3 * 1/8) ; systole is 1/3 of cycle; 8 LEDs.
 }
 
 Heart::~Heart() {
-    if (_stateTimeTable) {
-        delete [] _stateTimeTable;
-        _stateTimeTable = NULL;
-    }
-
-    if (_currTimeTable) {
-        delete [] _currTimeTable;
-        _currTimeTable = NULL;
-    }
 }
 
 void Heart::updateBpm(unsigned int bpm) {
@@ -438,43 +390,26 @@ void Heart::updateBpm(unsigned int bpm) {
 }
 
 void Heart::run(unsigned long elapsed_millis) {
-    int ledState = 0;
-    if (_numLedStates <= 0) {
-        return;
+  static unsigned long numBeats = 0;
+  if(elapsed_millis >= _currTimeToNextState) {
+    if(_currLedState < _numLedStates-1) {
+      _currLedState++;
+      Heart::writeLed(_ledStates[_currLedState]);
+      _currTimeToNextState += _currTimePerLED;
+    } else if(_currLedState == _numLedStates-1) {
+      _currTimeToNextState += _diastole_len;
+      _currLedState++;
+    } else {
+      _currLedState = 0;
+      Heart::writeLed(_ledStates[_currLedState]);
+
+      if(_newBpm != _currBpm) {
+        _currBpm = _newBpm;
+        UpdateTimings();
+      }
+      _currTimeToNextState += _currTimePerLED;
     }
-    static unsigned long numBeats = 0;
-
-    if (_phase == PHASE_SYSTOLE) {
-        if (_currLedState >= _numLedStates) {
-            _phase = PHASE_DIASTOLE;
-        } else {
-            unsigned long nxt_state = _currTimeTable[_currLedState];
-            if (elapsed_millis >= nxt_state) {
-                ledState = _ledStates[_currLedState];
-                Heart::writeLed(ledState);
-                _currLedState++;
-            }
-        }
-    } else if (_phase == PHASE_DIASTOLE) {
-        unsigned long nxt_state = _currTimeTable[_numLedStates];
-        if (elapsed_millis >= nxt_state) {
-            _phase = PHASE_SYSTOLE;
-            _currLedState = 0;
-
-            if(_newBpm != _currBpm) {
-                _currBpm = _newBpm;
-                updateStateTable();
-            }
-
-            updateTimeTable(elapsed_millis);
-
-            numBeats++;
-
-            Serial.print("numBeats = ");
-            Serial.print(numBeats);
-            Serial.print("\n");
-        }
-    }
+  }
 }
 
 InputPinReader::InputPinReader(int pin) : _pin(pin), _high(false) {
@@ -505,7 +440,10 @@ PressureChecker::~PressureChecker() {}
 
 Corbot::Corbot(Heart* heart, auto_ptr<ListElem> readers) :
   _heart(heart),
-  _currBpm(CORBOT_RESTING_HEART_RATE), _minBpm(CORBOT_RESTING_HEART_RATE), _maxBpm(CORBOT_INCREASED_HEART_RATE), _readers(readers) {
+  _currBpm(CORBOT_RESTING_HEART_RATE),
+  _minBpm(CORBOT_RESTING_HEART_RATE),
+  _maxBpm(CORBOT_INCREASED_HEART_RATE),
+  _readers(readers) {
     _heart->updateBpm(_currBpm);
 }
 
@@ -560,8 +498,8 @@ void setup(void) {
   auto_ptr<TimerFunction> corbot(new Corbot(static_cast<Heart*>(heart.get()),
                                                                     readers));
 
-  TimerSys::register_func(heart, 0);
-  TimerSys::register_func(corbot, CORBOT_CHECK_INTERVAL_MS);
+  TimerSys::register_func(heart, 0, elapsed_millis);
+  TimerSys::register_func(corbot, CORBOT_CHECK_INTERVAL_MS, elapsed_millis);
 }
 
 void loop(void) {
