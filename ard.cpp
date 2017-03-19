@@ -2,8 +2,24 @@
     #include "common.h"
 #endif
 
+#include <stdarg.h>
+
+#ifdef printf
+#undef printf
+#define printf ard_printf
+#endif
+
 /* http://disease13.imascientist.org.au/2013/03/18/what-are-the-highest-and-lowest-known-pulses-heart-rate-recorded/ */
-#define MAX_HEART_RATE 400
+#define MAX_HEART_RATE 300
+#define MIN_HEART_RATE 40
+
+#define POSITION_SENSOR_PIN 11
+#define PRESSURE_SENSOR_PIN 12
+
+#define PHASE_INITIALIZING      0
+#define PHASE_SYSTOLE           1
+#define PHASE_DIASTOLE          2
+
 
 void sleep_device() {
 #if defined(LINUX_COMPILE)
@@ -19,10 +35,6 @@ void sleep_device() {
     }
 #endif
 }
-
-#define PHASE_INITIALIZING      0
-#define PHASE_SYSTOLE           1
-#define PHASE_DIASTOLE          2
 
 /*****************************************************************
     CLASS DECLARATION
@@ -168,6 +180,7 @@ class CheckPressure {
 private:
   UpdateLED* _updateLed;
 public:
+  bool _increasedPressure;
   CheckPressure();
   ~CheckPressure();
   void run();
@@ -178,6 +191,9 @@ private:
   UpdateLED* _updateLed;
   auto_ptr<CheckPosition> _cpos;
   auto_ptr<CheckPressure> _cpressure;
+  int _currBpm;
+  int _minBpm;
+  int _maxBpm;
 public:
   Corbot(UpdateLED* updateLed, auto_ptr<CheckPosition> cpos, auto_ptr<CheckPressure> cpressure);
   ~Corbot();
@@ -198,10 +214,7 @@ unsigned char UpdateLED::_ledStates[] = {
     0x80
 };
 
-unsigned char UpdateLED::_ledPins[] = {2,3,4,5,6,7,8,9};
-
-#define POSITION_SENSOR_PIN 11
-#define PRESSURE_SENSOR_PIN 12
+unsigned char UpdateLED::_ledPins[] = {10, 3,4,5,6,7,8,9};
 
 
 
@@ -210,13 +223,19 @@ unsigned long round_closest_divide(unsigned long dividend, unsigned long divisor
     return (dividend + (divisor / 2)) / divisor;
 }
 
-CheckPressure::CheckPressure() {
+CheckPressure::CheckPressure() : _increasedPressure(false) {
+  pinMode(PRESSURE_SENSOR_PIN, INPUT);
 }
 
 CheckPressure::~CheckPressure() {
 }
 
 void CheckPressure::run() {
+  if (digitalRead(PRESSURE_SENSOR_PIN) == HIGH) {
+    _increasedPressure = true;
+  } else {
+    _increasedPressure = false;
+  }
 }
 
 CheckPosition::CheckPosition() : _standing(false) {
@@ -238,8 +257,9 @@ void CheckPosition::run() {
 Corbot::Corbot(UpdateLED* updateLed, auto_ptr<CheckPosition> cpos, auto_ptr<CheckPressure> cpressure) :
   _updateLed(updateLed),
   _cpos(cpos),
-  _cpressure(cpressure) {
-
+  _cpressure(cpressure),
+  _currBpm(60), _minBpm(60), _maxBpm(120) {
+    _updateLed->updateBpm(_currBpm);
 }
 
 Corbot::~Corbot() {
@@ -247,7 +267,31 @@ Corbot::~Corbot() {
 }
 
 void Corbot::run(unsigned long elapsed_millis) {
+  bool increaseHeartRate = false;
+  _cpos->run();
+  _cpressure->run();
 
+  if(_cpos->_standing == true) {
+    increaseHeartRate = true;
+  }
+
+  if(_cpressure->_increasedPressure == true) {
+    increaseHeartRate = true;
+  }
+
+  #define BPM_ACCELERATION 5
+
+  if(increaseHeartRate) {
+    int newBpm = _currBpm + BPM_ACCELERATION;
+
+    _currBpm = newBpm > _maxBpm ? _maxBpm:newBpm;
+  } else {
+    int newBpm = _currBpm - BPM_ACCELERATION;
+
+    _currBpm = newBpm < _minBpm ? _minBpm:newBpm;
+  }
+
+  _updateLed->updateBpm(_currBpm);
 }
 
 
@@ -382,6 +426,7 @@ void TimerSys::update(unsigned long elapsed_millis) {
 }
 
 void printTimeTable(unsigned long* pTimeTable, int size) {
+#if 0
     Serial.print("\n");
     for (int i=0; i < size; i++) {
         Serial.print("timeTable[");
@@ -390,6 +435,7 @@ void printTimeTable(unsigned long* pTimeTable, int size) {
         Serial.print(*pTimeTable++);
         Serial.print("\n");
     }
+#endif
 }
 
 void UpdateLED::updateTimeTable(unsigned long elapsed_millis) {
@@ -466,7 +512,11 @@ UpdateLED::~UpdateLED() {
     }
 }
 void UpdateLED::updateBpm(unsigned int bpm) {
-  if(bpm >= MAX_HEART_RATE) {
+  if(bpm == _currBpm) {
+    return;
+  }
+
+  if(bpm > MAX_HEART_RATE) {
     return;
   }
 
@@ -512,6 +562,19 @@ void UpdateLED::run(unsigned long elapsed_millis) {
         }
     }
 }
+
+#if 0
+void ard_printf(const char *format, ...) {
+  static char buf[100];
+  va_list ap;
+
+  va_start(ap, format);
+  vsnprintf(buf, sizeof(buf), format, ap);
+  Serial.print(buf);
+
+  va_end(ap);
+}
+#endif
 
 
 void setup(void) {
