@@ -127,9 +127,9 @@ private:
     static unsigned char _ledStates[];
     static unsigned char _ledPins[];
 
-    unsigned int _currLedState;
-    unsigned long _currTimeToNextState;
-    unsigned long _currTimePerLED;
+    unsigned int _ledStateIndex;
+    unsigned long _timeToNxtState;
+    unsigned long _timePerLed;
     int _numLedStates;
     unsigned int _currBpm;
     unsigned int _newBpm;
@@ -214,11 +214,6 @@ unsigned char Heart::_ledStates[] = {
 /****************************************************************/
 
 unsigned char Heart::_ledPins[] = {2,3,4,5,6,7,8,9};
-
-unsigned long round_closest_divide(unsigned long dividend, unsigned long divisor)
-{
-    return (dividend + (divisor / 2)) / divisor;
-}
 
 Element::Element() : _next(0) {}
 Element::~Element() {}
@@ -343,9 +338,9 @@ void Heart::writeLed(unsigned char state) {
 
 Heart::Heart(unsigned int bpm, unsigned long elapsed_millis) :
     TimerFunction(),
-    _currLedState(0),
-    _currTimeToNextState(0),
-    _currTimePerLED(0),
+    _ledStateIndex(0),
+    _timeToNxtState(0),
+    _timePerLed(0),
     _numLedStates(0),
     _currBpm(bpm),
     _newBpm(bpm),
@@ -362,16 +357,16 @@ Heart::Heart(unsigned int bpm, unsigned long elapsed_millis) :
     }
 
     UpdateTimings();
-    _currTimeToNextState = elapsed_millis + _currTimePerLED;
+    _timeToNxtState = elapsed_millis + _timePerLed;
 
-    unsigned char ledState = _ledStates[_currLedState];
+    unsigned char ledState = _ledStates[_ledStateIndex];
     Heart:writeLed(ledState);
 }
 
 void Heart::UpdateTimings() {
   _ms_per_cycle = ((unsigned long) SECONDS_IN_1_MIN * MS_IN_1_SEC) / _currBpm;
   _diastole_len = (_ms_per_cycle * 2) / 3; // diastole is 2/3 of cycle
-  _currTimePerLED = _ms_per_cycle / 24; // (ms_per_cycle * 1/3 * 1/8) ; systole is 1/3 of cycle; 8 LEDs.
+  _timePerLed = _ms_per_cycle / 24; // (ms_per_cycle * 1/3 * 1/8) ; systole is 1/3 of cycle; 8 LEDs.
 }
 
 Heart::~Heart() {
@@ -391,23 +386,28 @@ void Heart::updateBpm(unsigned int bpm) {
 
 void Heart::run(unsigned long elapsed_millis) {
   static unsigned long numBeats = 0;
-  if(elapsed_millis >= _currTimeToNextState) {
-    if(_currLedState < _numLedStates-1) {
-      _currLedState++;
-      Heart::writeLed(_ledStates[_currLedState]);
-      _currTimeToNextState += _currTimePerLED;
-    } else if(_currLedState == _numLedStates-1) {
-      _currTimeToNextState += _diastole_len;
-      _currLedState++;
+  if(elapsed_millis >= _timeToNxtState) {
+    if(_ledStateIndex < _numLedStates-1) {
+      _ledStateIndex++;
+      Heart::writeLed(_ledStates[_ledStateIndex]);
+      _timeToNxtState += _timePerLed;
+    } else if(_ledStateIndex == _numLedStates-1) {
+      _timeToNxtState += _diastole_len;
+      _ledStateIndex++;
+
+      numBeats++;
+      Serial.print("\nHEARTBEATS = [ ");
+      Serial.print(numBeats);
+      Serial.print(" ]\n\n");
     } else {
-      _currLedState = 0;
-      Heart::writeLed(_ledStates[_currLedState]);
+      _ledStateIndex = 0;
+      Heart::writeLed(_ledStates[_ledStateIndex]);
 
       if(_newBpm != _currBpm) {
         _currBpm = _newBpm;
         UpdateTimings();
       }
-      _currTimeToNextState += _currTimePerLED;
+      _timeToNxtState += _timePerLed;
     }
   }
 }
