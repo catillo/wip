@@ -11,7 +11,6 @@
 
 /* http://disease13.imascientist.org.au/2013/03/18/what-are-the-highest-and-lowest-known-pulses-heart-rate-recorded/ */
 #define MAX_HEART_RATE 300
-#define MIN_HEART_RATE 40
 
 #define POSITION_SENSOR_PIN 11
 #define PRESSURE_SENSOR_PIN 12
@@ -36,9 +35,6 @@ void sleep_device() {
 #endif
 }
 
-/*****************************************************************
-    CLASS DECLARATION
-*****************************************************************/
 template <class T>
 class auto_ptr {
 private:
@@ -200,8 +196,6 @@ public:
   void run(unsigned long elapsed_millis);
 };
 
-
-
 ListElem TimerSys::_functions;
 unsigned char UpdateLED::_ledStates[] = {
     0x01,
@@ -215,8 +209,6 @@ unsigned char UpdateLED::_ledStates[] = {
 };
 
 unsigned char UpdateLED::_ledPins[] = {10, 3,4,5,6,7,8,9};
-
-
 
 unsigned long round_closest_divide(unsigned long dividend, unsigned long divisor)
 {
@@ -263,7 +255,6 @@ Corbot::Corbot(UpdateLED* updateLed, auto_ptr<CheckPosition> cpos, auto_ptr<Chec
 }
 
 Corbot::~Corbot() {
-
 }
 
 void Corbot::run(unsigned long elapsed_millis) {
@@ -294,10 +285,6 @@ void Corbot::run(unsigned long elapsed_millis) {
   _updateLed->updateBpm(_currBpm);
 }
 
-
-/*****************************************************************
-    CLASS BODY
-*****************************************************************/
 
 Element::Element() : _next(0) {
 }
@@ -426,7 +413,7 @@ void TimerSys::update(unsigned long elapsed_millis) {
 }
 
 void printTimeTable(unsigned long* pTimeTable, int size) {
-#if 0
+#if defined(DEBUG_ON)
     Serial.print("\n");
     for (int i=0; i < size; i++) {
         Serial.print("timeTable[");
@@ -562,20 +549,6 @@ void UpdateLED::run(unsigned long elapsed_millis) {
         }
     }
 }
-
-#if 0
-void ard_printf(const char *format, ...) {
-  static char buf[100];
-  va_list ap;
-
-  va_start(ap, format);
-  vsnprintf(buf, sizeof(buf), format, ap);
-  Serial.print(buf);
-
-  va_end(ap);
-}
-#endif
-
 
 void setup(void) {
   Serial.begin(230400);
