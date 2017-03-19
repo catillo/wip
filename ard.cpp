@@ -164,7 +164,6 @@ public:
 
 class CheckPosition {
 private:
-  UpdateLED* _updateLed;
 public:
   bool _standing;
   CheckPosition();
@@ -174,7 +173,6 @@ public:
 
 class CheckPressure {
 private:
-  UpdateLED* _updateLed;
 public:
   bool _increasedPressure;
   CheckPressure();
