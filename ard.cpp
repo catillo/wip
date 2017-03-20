@@ -22,7 +22,7 @@
 /****************************************************************/
 /****************************************************************/
 
-template <class T>
+template<class T>
 class auto_ptr {
 private:
     T* _t;
@@ -37,7 +37,7 @@ public:
     auto_ptr(auto_ptr<_T1> &__a) : _t(__a.release()) {
     }
 
-    auto_ptr<T> operator=(auto_ptr<T>& p) {
+    auto_ptr<T> operator=(auto_ptr<T> &p) {
         if (_t) {
             delete _t;
         }
@@ -50,7 +50,7 @@ public:
     }
 
     ~auto_ptr() {
-        if(_t) {
+        if (_t) {
             delete _t;
             _t = NULL;
         }
@@ -91,10 +91,10 @@ public:
 
 class ListIterator {
 private:
-    ListElem *_owner;
+    ListElem* _owner;
     unsigned int _index;
 public:
-    ListIterator(ListElem *owner);
+    ListIterator(ListElem* owner);
     Element* next();
     bool hasNext();
 
@@ -146,53 +146,53 @@ public:
 
 class InputPinReader : public Element {
 private:
-  int _pin;
+    int _pin;
 public:
-  int _high;
-  InputPinReader(int pin);
-  virtual ~InputPinReader();
-  void run();
+    int _high;
+    InputPinReader(int pin);
+    virtual ~InputPinReader();
+    void run();
 };
 
 class TemperatureChecker : public InputPinReader {
 private:
 public:
-  TemperatureChecker();
-  ~TemperatureChecker();
+    TemperatureChecker();
+    ~TemperatureChecker();
 };
 
 class VibrationChecker : public InputPinReader {
 private:
 public:
-  VibrationChecker();
-  ~VibrationChecker();
+    VibrationChecker();
+    ~VibrationChecker();
 };
 
 class PositionChecker : public InputPinReader {
 private:
 public:
-  PositionChecker();
-  ~PositionChecker();
+    PositionChecker();
+    ~PositionChecker();
 };
 
 class PressureChecker : public InputPinReader {
 private:
 public:
-  PressureChecker();
-  ~PressureChecker();
+    PressureChecker();
+    ~PressureChecker();
 };
 
 class Corbot : public TimerFunction {
 private:
-  Heart* _heart;
-  int _currBpm;
-  int _minBpm;
-  int _maxBpm;
-  auto_ptr<ListElem> _readers;
+    Heart* _heart;
+    int _currBpm;
+    int _minBpm;
+    int _maxBpm;
+    auto_ptr<ListElem> _readers;
 public:
-  Corbot(Heart* heart, auto_ptr<ListElem> readers);
-  ~Corbot();
-  void run(unsigned long elapsed_millis);
+    Corbot(Heart* heart, auto_ptr<ListElem> readers);
+    ~Corbot();
+    void run(unsigned long elapsed_millis);
 };
 
 ListElem TimerSys::_functions;
@@ -213,12 +213,12 @@ unsigned char Heart::_ledStates[] = {
 /****************************************************************/
 /****************************************************************/
 
-unsigned char Heart::_ledPins[] = {2,3,4,5,6,7,8,9};
+unsigned char Heart::_ledPins[] = { 2, 3, 4, 5, 6, 7, 8, 9 };
 
-Element::Element() : _next(0) {}
-Element::~Element() {}
+Element::Element() : _next(0) { }
+Element::~Element() { }
 
-ListElem::ListElem() : _head(0) {}
+ListElem::ListElem() : _head(0) { }
 
 ListElem::~ListElem() {
     while (_head != NULL) {
@@ -251,16 +251,16 @@ bool ListElem::add(auto_ptr<Element> e) {
 }
 
 auto_ptr<ListIterator> ListElem::iterator() {
-    auto_ptr<ListIterator> r (new ListIterator(this));
+    auto_ptr<ListIterator> r(new ListIterator(this));
 
     return r;
 }
 
-ListIterator::ListIterator(ListElem* owner) : _owner(owner), _index(0) {}
-ListIterator::~ListIterator() {}
+ListIterator::ListIterator(ListElem* owner) : _owner(owner), _index(0) { }
+ListIterator::~ListIterator() { }
 
 Element* ListIterator::next() {
-    Element *runner = _owner->_head;
+    Element* runner = _owner->_head;
     unsigned int i = 0;
     while (runner != NULL) {
         if (i == _index) {
@@ -276,7 +276,7 @@ Element* ListIterator::next() {
 }
 
 bool ListIterator::hasNext() {
-    Element *runner = _owner->_head;
+    Element* runner = _owner->_head;
     unsigned int i = 0;
     while (runner != NULL) {
         if (i == _index) {
@@ -295,13 +295,13 @@ void TimerFunction::setInterval(unsigned long interval, unsigned long elapsed_mi
     _timeToNextRun = elapsed_millis + _interval;
 }
 
-TimerFunction::TimerFunction() : _interval(0), _timeToNextRun(0) {}
-TimerFunction::~TimerFunction() {}
+TimerFunction::TimerFunction() : _interval(0), _timeToNextRun(0) { }
+TimerFunction::~TimerFunction() { }
 
 void TimerFunction::update(unsigned long elapsed_millis) {
     if (_interval == 0) {
-      run(elapsed_millis);
-    } else if(elapsed_millis >= _timeToNextRun) {
+        run(elapsed_millis);
+    } else if (elapsed_millis >= _timeToNextRun) {
         run(elapsed_millis);
         _timeToNextRun += _interval;
     }
@@ -309,7 +309,7 @@ void TimerFunction::update(unsigned long elapsed_millis) {
 
 bool TimerSys::register_func(auto_ptr<TimerFunction> tf, unsigned long interval, unsigned long elapsed_millis) {
     tf->setInterval(interval, elapsed_millis);
-    auto_ptr<Element> t (tf.release());
+    auto_ptr<Element> t(tf.release());
     return TimerSys::_functions.add(t);
 }
 
@@ -323,17 +323,17 @@ void TimerSys::update(unsigned long elapsed_millis) {
 }
 
 void Heart::writeLed(unsigned char state) {
-  unsigned char bitMask = 0x01;
+    unsigned char bitMask = 0x01;
 
-  for(int i=0; i < sizeof(Heart::_ledPins); i++) {
-    if(state & bitMask) {
-      digitalWrite(Heart::_ledPins[i], HIGH);
-    } else {
-      digitalWrite(Heart::_ledPins[i], LOW);
+    for (int i = 0; i < sizeof(Heart::_ledPins); i++) {
+        if (state & bitMask) {
+            digitalWrite(Heart::_ledPins[i], HIGH);
+        } else {
+            digitalWrite(Heart::_ledPins[i], LOW);
+        }
+
+        bitMask <<= 1;
     }
-
-    bitMask <<= 1;
-  }
 }
 
 Heart::Heart(unsigned int bpm, unsigned long elapsed_millis) :
@@ -347,8 +347,8 @@ Heart::Heart(unsigned int bpm, unsigned long elapsed_millis) :
     _ms_per_cycle(0),
     _diastole_len(0) {
 
-    for(int i = 0; i < sizeof(Heart::_ledPins); i++){
-      pinMode(Heart::_ledPins[i], OUTPUT);
+    for (int i = 0; i < sizeof(Heart::_ledPins); i++) {
+        pinMode(Heart::_ledPins[i], OUTPUT);
     }
 
     _numLedStates = sizeof(Heart::_ledStates);
@@ -360,150 +360,151 @@ Heart::Heart(unsigned int bpm, unsigned long elapsed_millis) :
     _timeToNxtState = elapsed_millis + _timePerLed;
 
     unsigned char ledState = _ledStates[_ledStateIndex];
-    Heart:writeLed(ledState);
+    Heart::writeLed(ledState);
 }
 
 void Heart::UpdateTimings() {
-  _ms_per_cycle = ((unsigned long) SECONDS_IN_1_MIN * MS_IN_1_SEC) / _currBpm;
-  _diastole_len = (_ms_per_cycle * 2) / 3; // diastole is 2/3 of cycle
-  _timePerLed = _ms_per_cycle / 24; // (ms_per_cycle * 1/3 * 1/8) ; systole is 1/3 of cycle; 8 LEDs.
+    _ms_per_cycle = ((unsigned long)SECONDS_IN_1_MIN * MS_IN_1_SEC) / _currBpm;
+    _diastole_len = (_ms_per_cycle * 2) / 3; // diastole is 2/3 of cycle
+    _timePerLed = _ms_per_cycle / 24; // (ms_per_cycle * 1/3 * 1/8) ; systole is 1/3 of cycle; 8 LEDs.
 }
 
 Heart::~Heart() {
 }
 
 void Heart::updateBpm(unsigned int bpm) {
-  if(bpm == _currBpm) {
-    return;
-  }
+    if (bpm == _currBpm) {
+        return;
+    }
 
-  if(bpm > MAX_HEART_RATE) {
-    return;
-  }
+    if (bpm > MAX_HEART_RATE) {
+        return;
+    }
 
-  _newBpm = bpm;
+    _newBpm = bpm;
 }
 
 void Heart::run(unsigned long elapsed_millis) {
-  static unsigned long numBeats = 0;
-  if(elapsed_millis >= _timeToNxtState) {
-    if(_ledStateIndex < _numLedStates-1) {
-      _ledStateIndex++;
-      Heart::writeLed(_ledStates[_ledStateIndex]);
-      _timeToNxtState += _timePerLed;
-    } else if(_ledStateIndex == _numLedStates-1) {
-      _timeToNxtState += _diastole_len;
-      _ledStateIndex++;
+    static unsigned long numBeats = 0;
+    if (elapsed_millis >= _timeToNxtState) {
+        if (_ledStateIndex < _numLedStates - 1) {
+            _ledStateIndex++;
+            Heart::writeLed(_ledStates[_ledStateIndex]);
+            _timeToNxtState += _timePerLed;
+        } else if (_ledStateIndex == _numLedStates - 1) {
+            _timeToNxtState += _diastole_len;
+            _ledStateIndex++;
 
-      numBeats++;
-      Serial.print("\nHEARTBEATS = [ ");
-      Serial.print(numBeats);
-      Serial.print(" ]\n\n");
-    } else {
-      _ledStateIndex = 0;
-      Heart::writeLed(_ledStates[_ledStateIndex]);
+            numBeats++;
+            Serial.print("\nHEARTBEATS = [ ");
+            Serial.print(numBeats);
+            Serial.print(" ]\n\n");
+        } else {
+            _ledStateIndex = 0;
+            Heart::writeLed(_ledStates[_ledStateIndex]);
 
-      if(_newBpm != _currBpm) {
-        _currBpm = _newBpm;
-        UpdateTimings();
-      }
-      _timeToNxtState += _timePerLed;
+            if (_newBpm != _currBpm) {
+                _currBpm = _newBpm;
+                UpdateTimings();
+            }
+            _timeToNxtState += _timePerLed;
+        }
     }
-  }
 }
 
 InputPinReader::InputPinReader(int pin) : _pin(pin), _high(false) {
-  pinMode(_pin, INPUT);
+    pinMode(_pin, INPUT);
 }
 
-InputPinReader::~InputPinReader() {}
+InputPinReader::~InputPinReader() { }
 
 void InputPinReader::run() {
-  if (digitalRead(_pin) == HIGH) {
-    _high = true;
-  } else {
-    _high = false;
-  }
+    if (digitalRead(_pin) == HIGH) {
+        _high = true;
+    } else {
+        _high = false;
+    }
 }
 
-TemperatureChecker::TemperatureChecker() : InputPinReader(TEMPERATURE_SENSOR_PIN) {}
-TemperatureChecker::~TemperatureChecker() {}
+TemperatureChecker::TemperatureChecker() : InputPinReader(TEMPERATURE_SENSOR_PIN) { }
+TemperatureChecker::~TemperatureChecker() { }
 
-VibrationChecker::VibrationChecker() : InputPinReader(VIBRATION_SENSOR_PIN) {}
-VibrationChecker::~VibrationChecker() {}
+VibrationChecker::VibrationChecker() : InputPinReader(VIBRATION_SENSOR_PIN) { }
+VibrationChecker::~VibrationChecker() { }
 
-PositionChecker::PositionChecker() : InputPinReader(POSITION_SENSOR_PIN) {}
-PositionChecker::~PositionChecker() {}
+PositionChecker::PositionChecker() : InputPinReader(POSITION_SENSOR_PIN) { }
+PositionChecker::~PositionChecker() { }
 
-PressureChecker::PressureChecker() : InputPinReader(PRESSURE_SENSOR_PIN) {}
-PressureChecker::~PressureChecker() {}
+PressureChecker::PressureChecker() : InputPinReader(PRESSURE_SENSOR_PIN) { }
+PressureChecker::~PressureChecker() { }
 
 Corbot::Corbot(Heart* heart, auto_ptr<ListElem> readers) :
-  _heart(heart),
-  _currBpm(CORBOT_RESTING_HEART_RATE),
-  _minBpm(CORBOT_RESTING_HEART_RATE),
-  _maxBpm(CORBOT_INCREASED_HEART_RATE),
-  _readers(readers) {
+    _heart(heart),
+    _currBpm(CORBOT_RESTING_HEART_RATE),
+    _minBpm(CORBOT_RESTING_HEART_RATE),
+    _maxBpm(CORBOT_INCREASED_HEART_RATE),
+    _readers(readers) {
     _heart->updateBpm(_currBpm);
 }
 
-Corbot::~Corbot() {}
+Corbot::~Corbot() { }
 
 void Corbot::run(unsigned long elapsed_millis) {
-  bool increaseHeartRate = false;
+    bool increaseHeartRate = false;
 
-  auto_ptr<ListIterator> i(_readers->iterator());
-  while(i->hasNext()) {
-    InputPinReader* r = static_cast<InputPinReader*>(i->next());
-    r->run();
-    if(r->_high) {
-      increaseHeartRate = true;
+    auto_ptr<ListIterator> i(_readers->iterator());
+    while (i->hasNext()) {
+        InputPinReader* r = static_cast<InputPinReader*>(i->next());
+        r->run();
+        if (r->_high) {
+            increaseHeartRate = true;
+        }
     }
-  }
 
-  if(increaseHeartRate) {
-    int newBpm = _currBpm + BPM_ACCELERATION;
+    if (increaseHeartRate) {
+        int newBpm = _currBpm + BPM_ACCELERATION;
 
-    _currBpm = newBpm > _maxBpm ? _maxBpm:newBpm;
-  } else {
-    int newBpm = _currBpm - BPM_ACCELERATION;
+        _currBpm = newBpm > _maxBpm ? _maxBpm : newBpm;
+    } else {
+        int newBpm = _currBpm - BPM_ACCELERATION;
 
-    _currBpm = newBpm < _minBpm ? _minBpm:newBpm;
-  }
+        _currBpm = newBpm < _minBpm ? _minBpm : newBpm;
+    }
 
-  _heart->updateBpm(_currBpm);
+    _heart->updateBpm(_currBpm);
 
-  Serial.print("bpm = ");
-  Serial.print(_currBpm);
-  Serial.print("\n");
+    Serial.print("bpm = ");
+    Serial.print(_currBpm);
+    Serial.print("\n");
 }
 
-void setup(void) {
-  Serial.begin(SERIAL_BAUD_RATE);
-  unsigned long elapsed_millis = millis();
+void setup(void) { 
+    Serial.begin(SERIAL_BAUD_RATE);
+    unsigned long elapsed_millis = millis();
 
-  auto_ptr<TimerFunction> heart(new Heart(CORBOT_RESTING_HEART_RATE, elapsed_millis));
+    auto_ptr<TimerFunction> heart(new Heart(CORBOT_RESTING_HEART_RATE, elapsed_millis));
 
-  auto_ptr<InputPinReader> tempChecker(new TemperatureChecker());
-  auto_ptr<InputPinReader> vibrationChecker(new VibrationChecker());
-  auto_ptr<InputPinReader> positionChecker(new PositionChecker());
-  auto_ptr<InputPinReader> pressureChecker(new PressureChecker());
+    auto_ptr<InputPinReader> tempChecker(new TemperatureChecker());
+    auto_ptr<InputPinReader> vibrationChecker(new VibrationChecker());
+    auto_ptr<InputPinReader> positionChecker(new PositionChecker());
+    auto_ptr<InputPinReader> pressureChecker(new PressureChecker());
 
-  auto_ptr<ListElem> readers(new ListElem());
-  readers->add(tempChecker);
-  readers->add(vibrationChecker);
-  readers->add(positionChecker);
-  readers->add(pressureChecker);
+    auto_ptr<ListElem> readers(new ListElem());
+    readers->add(tempChecker);
+    readers->add(vibrationChecker);
+    readers->add(positionChecker);
+    readers->add(pressureChecker);
 
-  auto_ptr<TimerFunction> corbot(new Corbot(static_cast<Heart*>(heart.get()),
-                                                                    readers));
+    auto_ptr<TimerFunction> corbot(new Corbot(static_cast<Heart*>(heart.get()),
+                                              readers));
 
-  TimerSys::register_func(heart, 0, elapsed_millis);
-  TimerSys::register_func(corbot, CORBOT_CHECK_INTERVAL_MS, elapsed_millis);
+    TimerSys::register_func(heart, 0, elapsed_millis);
+    TimerSys::register_func(corbot, CORBOT_CHECK_INTERVAL_MS, elapsed_millis);
 }
 
 void loop(void) {
-  unsigned long elapsed_millis = millis();
+    unsigned long elapsed_millis = millis();
 
-  TimerSys::update(elapsed_millis);
+    TimerSys::update(elapsed_millis);
 }
+
