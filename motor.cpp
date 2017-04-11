@@ -1,9 +1,24 @@
-/****************************************************************/
-/****************************************************************/
-/************************* Declarations **************************/
-/****************************************************************/
-/****************************************************************/
 #define SERIAL_BAUD_RATE              230400
+
+#include <ESP8266WiFi.h>
+
+#define TX_IO   1
+#define RX_IO   3
+#define D8      15
+#define D7      13
+#define D6      12
+#define D5      14
+#define D4      2
+#define D3      0
+#define D2      4
+#define D1      5
+#define D0      16
+#define CLK_IO        6
+#define SPI_MIS0_IO   7
+#define SPI_CS0_IO    11
+#define SPI_MOS1_IO   8
+#define SPIHD_IO      9
+#define SPIWP_IO      10
 
 template<class T>
 class auto_ptr {
@@ -105,63 +120,7 @@ public:
     static void update(unsigned long elapsed_millis);
 };
 
-
-class InputPinReader : public Element {
-private:
-    int _pin;
-public:
-    int _high;
-    InputPinReader(int pin);
-    virtual ~InputPinReader();
-    void run();
-};
-
-class ForwardButton : public InputPinReader {
-private:
-public:
-    ForwardButton();
-    ~ForwardButton();
-};
-
-class BackwardButton: public InputPinReader {
-private:
-public:
-    BackwardButton();
-    ~BackwardButton();
-};
-
-class LeftButton: public InputPinReader {
-private:
-public:
-    LeftButton();
-    ~LeftButton();
-};
-
-class RightButton: public InputPinReader {
-private:
-public:
-    RightButton();
-    ~RightButton();
-};
-
-
-class Robot : public TimerFunction {
-private:
-
-public:
-    Robot();
-    ~Robot();
-    void run(unsigned long elapsed_millis);
-};
-
 ListElem TimerSys::_functions;
-
-
-/****************************************************************/
-/****************************************************************/
-/************************* Definitions **************************/
-/****************************************************************/
-/****************************************************************/
 
 Element::Element() : _next(0) { }
 Element::~Element() { }
@@ -270,6 +229,16 @@ void TimerSys::update(unsigned long elapsed_millis) {
     }
 }
 
+class InputPinReader : public Element {
+private:
+    int _pin;
+public:
+    int _high;
+    InputPinReader(int pin);
+    virtual ~InputPinReader();
+    void run();
+};
+
 InputPinReader::InputPinReader(int pin) : _pin(pin), _high(false) {
     pinMode(_pin, INPUT);
 }
@@ -284,158 +253,117 @@ void InputPinReader::run() {
     }
 }
 
-ForwardButton::ForwardButton() : InputPinReader(8) { }
-ForwardButton::~ForwardButton() { }
+/*******************************************************************************************************************************/
+#define DEVSTAT_LED 0x01
 
-BackwardButton::BackwardButton() : InputPinReader(9) { }
-BackwardButton::~BackwardButton() { }
+class StatusLed : public TimerFunction {
+public:
+    typedef enum {
+        LED_STATE_CONNECTED = 0
+        , LED_STATE_ERROR
+        , LED_STATE_SEARCHING
+        , LED_STATE_AP_MODE
+        , LED_STATE_INVALID
+    } LED_STATE;
 
-LeftButton::LeftButton() : InputPinReader(10) { }
-LeftButton::~LeftButton() { }
+private:
+    typedef struct {
+        LED_STATE _state;
+        unsigned int _pattern;
+    } StatusLedPatternType;
 
-RightButton::RightButton() : InputPinReader(11) { }
-RightButton::~RightButton() { }
+    static StatusLedPatternType _patterns[];
+    LED_STATE _currState;
+    unsigned int _currPattern;
+    unsigned int _patternBitRunner;
+    unsigned int* findPattern(const LED_STATE state);
+public:
+    LED_STATE _newState;
 
+    StatusLed();
+    ~StatusLed();
+    void run(unsigned long elapsed_millis);
+};
 
-Robot::Robot() {
+StatusLed::StatusLedPatternType StatusLed::_patterns[] = {
+    {LED_STATE_CONNECTED, 0x8000}
+    , {LED_STATE_ERROR, 0xAAAA}
+    , {LED_STATE_SEARCHING, 0xF0F0}
+    , {LED_STATE_AP_MODE, 0xA000}
+    , {LED_STATE_INVALID, 0xFFFF}
+};
+
+unsigned int* StatusLed::findPattern(const LED_STATE state) {
+    StatusLedPatternType *runner = _patterns;
+    while (runner->_state != LED_STATE_INVALID) {
+        if (runner->_state == state) {
+            return &runner->_pattern;
+        }
+        runner++;
+    }
+    return NULL;
 }
 
-Robot::~Robot() { }
+StatusLed::StatusLed() : 
+    _currState(LED_STATE_SEARCHING)
+    , _currPattern(*findPattern(_currState))
+    , _patternBitRunner(0x8000)
+    , _newState(_currState) {
+    pinMode(D0, OUTPUT);
+    digitalWrite(D0, LOW);
 
-void Robot::run(unsigned long elapsed_millis) {
 }
 
-InputPinReader* forwardButton;
-InputPinReader* backwardButton;
-InputPinReader* leftButton;
-InputPinReader* rightButton;
+StatusLed::~StatusLed() { 
 
+}
+
+void StatusLed::run(unsigned long elapsed_millis) {
+    if (_patternBitRunner == 0x0000) {
+        _patternBitRunner = 0x8000;
+
+        if (_newState != _currState) {
+            _currState = _newState;
+
+            _currPattern = *findPattern(_currState);
+        }
+    }
+
+    if (_currPattern & _patternBitRunner) {
+        digitalWrite(D0, LOW);
+    } else {
+        digitalWrite(D0, HIGH);
+    }
+
+    _patternBitRunner >>= 1;
+}
+
+class Device {
+private:
+public:
+    unsigned long _status;
+    Device();
+    ~Device();
+};
+
+Device::Device() : _status(0) {
+}
+
+Device::~Device() {
+}
 
 void setup(void) { 
+    static Device* dev = NULL;
     Serial.begin(SERIAL_BAUD_RATE);
+    delay(2000);
     unsigned long elapsed_millis = millis();
 
-    forwardButton = new ForwardButton();
-    backwardButton = new BackwardButton();    
-    leftButton = new LeftButton();
-    rightButton = new RightButton();
+    auto_ptr<TimerFunction> statusLed(new StatusLed());
 
-    //auto_ptr<TimerFunction> robot(new Robot());
-
-    //TimerSys::register_func(robot, 500, elapsed_millis);
-
-
-     
-    pinMode(2, OUTPUT);
-    pinMode(3, OUTPUT);    
-
-    pinMode(4, OUTPUT);
-    pinMode(5, OUTPUT);     
-}
-
-void moveForward() {
-    digitalWrite(2, HIGH);     
-    digitalWrite(3, LOW);     
-    digitalWrite(4, HIGH);     
-    digitalWrite(5, LOW);     
-}
-
-void moveBackward() {
-    digitalWrite(3, HIGH);     
-    digitalWrite(2, LOW);     
-    digitalWrite(5, HIGH);     
-    digitalWrite(4, LOW);     
-}
-
-void moveLeft() {
-    digitalWrite(2, HIGH);     
-    digitalWrite(3, LOW);     
-    digitalWrite(5, HIGH);     
-    digitalWrite(4, LOW);     
-}
-
-void moveRight() {
-    digitalWrite(3, HIGH);     
-    digitalWrite(2, LOW);     
-    digitalWrite(4, HIGH);     
-    digitalWrite(5, LOW);     
-}
-
-void stop() {
-    digitalWrite(3, HIGH);     
-    digitalWrite(2, HIGH);     
-    digitalWrite(4, HIGH);     
-    digitalWrite(5, HIGH);       
+    TimerSys::register_func(statusLed, 125, elapsed_millis);
 }
 
 void loop(void) {
-    unsigned long elapsed_millis = millis();
-    Serial.print("checking inputs\n");
-    forwardButton->run();
-    backwardButton->run();
-    leftButton->run();
-    rightButton->run();
-    delay(10);
-
-
-    if(forwardButton->_high && !backwardButton->_high && !leftButton->_high && !rightButton->_high) {
-      //Serial.print("moveForward\n");      
-      moveForward();
-    } else if(!forwardButton->_high && backwardButton->_high && !leftButton->_high && !rightButton->_high) {
-      //Serial.print("moveBackward\n");            
-      moveBackward();
-    } else if(!forwardButton->_high && !backwardButton->_high && leftButton->_high && !rightButton->_high) {
-      //Serial.print("moveLeft\n");            
-      moveLeft();
-    }  else if(!forwardButton->_high && !backwardButton->_high && !leftButton->_high && rightButton->_high) {
-      //Serial.print("moveRight\n");                  
-      moveRight();
-    } else {
-      stop();
-    }
-    
-    #if 0
-    // forward
-    digitalWrite(2, LOW);     
-    digitalWrite(3, HIGH);     
-    delay(2000);
-
-     // open
-    digitalWrite(2, LOW);     
-    digitalWrite(3, LOW);     
-    delay(2000);         
-
-    // reverse
-    digitalWrite(2, HIGH);     
-    digitalWrite(3, LOW);     
-    delay(2000);             
-    
-    // hold
-    digitalWrite(2, HIGH);     
-    digitalWrite(3, HIGH);    
-    delay(2000);
-
-
-    // forward
-    digitalWrite(4, LOW);     
-    digitalWrite(5, HIGH);     
-    delay(2000);
-
-     // open
-    digitalWrite(4, LOW);     
-    digitalWrite(5, LOW);     
-    delay(2000);         
-
-    // reverse
-    digitalWrite(4, HIGH);     
-    digitalWrite(5, LOW);     
-    delay(2000);             
-    
-    // hold
-    digitalWrite(4, HIGH);     
-    digitalWrite(5, HIGH);    
-    delay(2000);    
-
-    #endif
+    TimerSys::update(millis());
 }
 
