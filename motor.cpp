@@ -525,7 +525,16 @@ Device::~Device() {
 }
 
 /*******************************************************************************************************************************/
+class WifiConnection : public TimerFunction {
+private:
+    void run(unsigned long elapsed_millis);
+public:
+    WifiConnection();
+    ~WifiConnection();
+};
 
+WifiConnection::WifiConnection() {
+}
 
 /*******************************************************************************************************************************/
 
