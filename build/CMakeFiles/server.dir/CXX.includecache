@@ -1,0 +1,20 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/Users/Atillo/git/wip/server.cpp
+stdio.h
+-
+string.h
+-
+sys/socket.h
+-
+arpa/inet.h
+-
+unistd.h
+-
+
