@@ -1,6 +1,6 @@
 #define SERIAL_BAUD_RATE              230400
 #include <memory>
-#include <string>
+#include <String>
 
 #define LWIP_INTERNAL
 #include <ESP8266WiFi.h>
@@ -17,18 +17,6 @@ void esp_yield();
 #include "lwip/ip_addr.h"
 #include "lwip/ip.h"
 #include "lwip/tcp.h"
-
-#if 0
-#include "debug.h"
-#include "ESP8266WiFi.h"
-#include "WiFiClient.h"
-#include "WiFiServer.h"
-#include "lwip/opt.h"
-#include "lwip/inet.h"
-#include "lwip/netif.h"
-#include "include/ClientContext.h"
-#include "c_types.h"
-#endif
 
 #define TX_IO   1
 #define RX_IO   3
@@ -47,6 +35,33 @@ void esp_yield();
 #define SPI_MOS1_IO   8
 #define SPIHD_IO      9
 #define SPIWP_IO      10
+
+#define TEMP_HOST "192.168.254.104"
+#define TEMP_PORT 8888
+
+/*******************************************************************************************************************************/
+struct free_functor {
+    void operator ()(char *p) {
+        if (p) {
+            free(p);
+        }
+    }
+};
+
+typedef std::unique_ptr<char, free_functor> unique_ptr_char;
+
+/*******************************************************************************************************************************/
+std::unique_ptr<char, free_functor> stringdup(char *p, unsigned int len) {
+    if (len == 0 || p == NULL) {return NULL;}
+
+    unique_ptr_char s(reinterpret_cast<char *>(malloc(len + 1)));
+    if (s == nullptr) {return std::move(s);}
+
+    memcpy(s.get(), p, len);
+    s.get()[len] = '\0';
+
+    return std::move(s);
+}
 
 /*******************************************************************************************************************************/
 class Element {
@@ -496,10 +511,7 @@ Device::~Device() {
 class TcpClient : public WiFiClient {
 public:
     void begin_connect(const char *host, uint16_t port);
-    bool isConnected();
 };
-
-bool TcpClient::isConnected() {return _client ? true : false;}
 
 void TcpClient::begin_connect(const char *host, uint16_t port) {
     IPAddress ip;
@@ -544,44 +556,130 @@ WifiActivity::~WifiActivity() { }
 class TcpConnection : public WifiActivity {
 private:
     std::unique_ptr<TcpClient> _client;
+    unique_ptr_char _host;
+    int _port;
+    typedef enum {
+        TCP_STATE_INITIALIZING,
+        TCP_STATE_WAITING_FOR_CONNECTION,
+        TCP_STATE_CONNECTED,
+        TCP_STATE_DISCONNECTED,
+    } TcpState;
+
+    TcpState _state;
 public:
-    TcpConnection();
+    TcpConnection(unique_ptr_char host, int port);
     virtual ~TcpConnection();
     void run(unsigned long elapsed_millis);
     void begin();
     void end();
+
+    void sendData(const char* data, size_t len);
+
+    virtual void connected() = 0;
+    virtual void disconnected() = 0;
+    virtual void available(const char *data, size_t dataLen) = 0;
 };
 
-TcpConnection::TcpConnection() : _client(nullptr) { }
+TcpConnection::TcpConnection(unique_ptr_char host, int port) :
+   _client(nullptr),
+   _host(std::move(host)),
+   _port(port),
+   _state(TCP_STATE_INITIALIZING) { }
+
 TcpConnection::~TcpConnection() { }
 
 void TcpConnection::end() {
     delete _client.release();
 }
 
+void TcpConnection::sendData(const char* data, size_t len) {
+    _client->write(data, len);
+}
+
 void TcpConnection::begin() {
-    _client.reset(new TcpClient());
-    _client->begin_connect("192.168.254.104", 8888);
+    if (_state == TCP_STATE_INITIALIZING) {
+        _client.reset(new TcpClient());
+        if (_client == nullptr || _host == nullptr) {return;}
+
+        _client->begin_connect(_host.get(), _port);
+        _state = TCP_STATE_WAITING_FOR_CONNECTION;
+    }
 }
 
 void TcpConnection::run(unsigned long elapsed_millis) {
-    if (_client.get() == NULL) {return;}
-
-    if (_client->isConnected()) {
-        Serial.print("\nTcpConnection is connected!\n");
+    if (_state == TCP_STATE_WAITING_FOR_CONNECTION) {
+        if (_client.get() && _client->connected()) {
+            _state = TCP_STATE_CONNECTED;
+            Serial.print("TcpConnection connected!\n");
+            connected();
+        }
+    } else if (_state == TCP_STATE_CONNECTED) {
+        if (_client->available()) {
+            size_t data = _client->readBytes((char *)NULL, (size_t)0);
+            available(data, data);
+        } else if (!_client->connected()) {
+            _state = TCP_STATE_DISCONNECTED;
+            disconnected();
+        }
+    } else if (_state == TCP_STATE_DISCONNECTED) {
+        Serial.print("ERROR: TcpConnection disconnected!\n");
     }
+}
+
+/*******************************************************************************************************************************/
+class MotorCommandControl : public TcpConnection {
+public:
+    MotorCommandControl();
+    ~MotorCommandControl();
+    void disconnected();
+    void connected();
+    void available(const char *data, unsigned int dataLen);
+};
+
+MotorCommandControl::MotorCommandControl() : TcpConnection(stringdup(TEMP_HOST,
+                                                                     strlen(TEMP_HOST)),
+                                                           TEMP_PORT) {
+}
+
+MotorCommandControl::~MotorCommandControl() {
+}
+
+void MotorCommandControl::available(const char *data, size_t dataLen) {
+    unique_ptr_char s = stringdup(data, dataLen);
+    Serial.print("MotorCommandControl: Data Available =");
+    Serial.println(s.get());
+
+
+}
+
+void MotorCommandControl::connected() {
+    Serial.print("MotorCommandControl: connected!\n");
+// We now create a URI for the request
+    String url = "/input/";
+    url += "?private_key=";
+    url += "&value=";
+
+    Serial.print("Requesting URL: ");
+    Serial.println(url);
+
+    sendData(url.c_str(), strlen(url.c_str()));
+}
+
+void MotorCommandControl::disconnected() {
+    Serial.print("MotorCommandControl: diconnected!\n");
 }
 
 /*******************************************************************************************************************************/
 class WifiActivityListItem {
 public:
-    WifiActivity* _activity;
+    WifiActivity *_activity;
     std::unique_ptr<WifiActivityListItem> _next;
 
-    WifiActivityListItem(WifiActivity* activity);
+    WifiActivityListItem(WifiActivity *activity);
 };
 
-WifiActivityListItem::WifiActivityListItem(WifiActivity* activity) : _activity(activity), _next(nullptr) {}
+WifiActivityListItem::WifiActivityListItem(WifiActivity *activity) : _activity(activity), _next(nullptr) { }
+
 /*******************************************************************************************************************************/
 class WifiConnection : public TimerFunction {
 private:
@@ -604,13 +702,13 @@ private:
 
     void run(unsigned long elapsed_millis);
 public:
-    void addActivity(WifiActivity* a);
+    void addActivity(WifiActivity *a);
     WifiConnection(StatusLed *statusLed);
     ~WifiConnection();
 };
 
 void WifiConnection::initializeActivities() {
-    WifiActivityListItem* runner = _activities.get();
+    WifiActivityListItem *runner = _activities.get();
 
     while (runner != NULL) {
         runner->_activity->begin();
@@ -619,7 +717,7 @@ void WifiConnection::initializeActivities() {
 }
 
 void WifiConnection::deinitializeActivities() {
-    WifiActivityListItem* runner = _activities.get();
+    WifiActivityListItem *runner = _activities.get();
 
     while (runner != NULL) {
         runner->_activity->end();
@@ -627,10 +725,10 @@ void WifiConnection::deinitializeActivities() {
     }
 }
 
-void WifiConnection::addActivity(WifiActivity* a) {
+void WifiConnection::addActivity(WifiActivity *a) {
     std::unique_ptr<WifiActivityListItem> w(new WifiActivityListItem(a));
 
-    WifiActivityListItem* runner = _activities.get();
+    WifiActivityListItem *runner = _activities.get();
     if (runner == NULL) {
         _activities = std::move(w);
         return;
@@ -650,8 +748,8 @@ WifiConnection::WifiConnection(StatusLed *statusLed) : TimerFunction(),
    _password("ttui987sde_"),
    _state(WIFI_BEGIN_CONNECTING),
    _retries(0),
-   _statusLed(statusLed), 
-    _activities(nullptr) {
+   _statusLed(statusLed),
+   _activities(nullptr) {
 }
 
 WifiConnection::~WifiConnection() {
@@ -704,8 +802,8 @@ void setup(void) {
     std::unique_ptr<TimerFunction> statusLed(new StatusLed());
     std::unique_ptr<WifiConnection> wifi(new WifiConnection(static_cast<StatusLed *>(statusLed.get())));
 
-    std::unique_ptr<WifiActivity> tcpConnection(new TcpConnection());
-    wifi->addActivity(tcpConnection.get());
+    std::unique_ptr<WifiActivity> motorCommandControl(new MotorCommandControl());
+    wifi->addActivity(motorCommandControl.get());
 
     Serial.begin(SERIAL_BAUD_RATE);
     delay(5000);
@@ -714,7 +812,7 @@ void setup(void) {
     TimerSys::register_func(std::move(statusLed), 125, elapsed_millis);
     TimerSys::register_func(std::move(motors), 10, elapsed_millis);
     TimerSys::register_func(std::move(wifi), 1000, elapsed_millis);
-    TimerSys::register_func(std::move(tcpConnection), 1000, elapsed_millis);
+    TimerSys::register_func(std::move(motorCommandControl), 1000, elapsed_millis);
 }
 
 void loop(void) {

@@ -1,4 +1,5 @@
 #include<stdio.h>
+#include<stdlib.h>
 #include<string.h>    //strlen
 #include<sys/socket.h>
 #include<arpa/inet.h> //inet_addr
@@ -51,6 +52,9 @@ int main(int argc , char *argv[])
     //Receive a message from client
     while( (read_size = recv(client_sock , client_message , 2000 , 0)) > 0 )
     {
+        char *msg = strndup(client_message, read_size);
+        fprintf(stderr, "Received = %s\n", msg);
+        free(msg);
         //Send the message back to client
         write(client_sock , client_message , strlen(client_message));
     }
